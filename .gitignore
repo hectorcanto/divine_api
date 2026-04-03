@@ -1,0 +1,5 @@
+# TODO(h): get a complete one from a reference like toptal
+.idea
+.private/*
+**/__pycache__
+.reports

@@ -1,0 +1,59 @@
+services:
+  app:
+    ports:
+    - "8080:8080"
+    # add volumes for reloading
+    container_name: divine
+    hostname: divine
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+    restart: unless-stopped
+    env_file:
+      - .private/local.compose.env
+
+  db:
+    image: postgres:18-alpine
+    container_name: op_db
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "p4ssw0rd"
+      POSTGRES_DB: "divine_local"
+    command: [ "postgres", "-c", "log_statement=all" ]
+    volumes:
+      - ./deploy/create_db.sql:/docker-entrypoint-initdb.d/create_databases.sql
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: "pg_isready -q -U postgres"
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "14317:4317"     # OTLP gRPC
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+  # NOTE still not working with test containers
+  tester:
+    build:
+      dockerfile: ./Dockerfile.tests
+      context: .
+    restart: no
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "984"
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host-gateway
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    extra_hosts:
+      - "host-gateway:host-gateway"
+    #environment: DVN_ENV_EXTRA: LOCAL_DOCKER
+    stop_signal: SIGKILL
+    stdin_open: true
+    tty: true
